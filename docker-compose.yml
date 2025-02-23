@@ -33,10 +33,19 @@ services:
         condition: service_completed_successfully
     command: python manage.py run_bot
 
+  userbot:
+    <<: *x-backend-service
+    expose:
+      - 8080
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: python manage.py run_userbot
+
   celery-worker:
     <<: *x-backend-service
     depends_on:
-      - bot
+      - userbot
       - postgres
       - redis
     command: celery -A app worker --loglevel=info
@@ -57,6 +66,7 @@ services:
     depends_on:
       - backend
       - bot
+      - userbot
 
   postgres:
     image: postgres

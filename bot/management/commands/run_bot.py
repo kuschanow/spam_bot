@@ -1,12 +1,12 @@
 import asyncio
+import logging
 
 from aiogram import Bot
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
-from bot.logger import logger
-from django_celery_beat.models import CrontabSchedule, PeriodicTask
+logger = logging.getLogger(__name__)
 
 
 async def on_startup(bot: Bot):

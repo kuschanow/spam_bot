@@ -10,10 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import logging
 from pathlib import Path
 from string import Template
 
 import environ
+import seqlog
 
 env = environ.Env()
 environ.Env.read_env('./.env')
@@ -63,7 +65,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'debug_toolbar',
 
-    'bot.apps.BotConfig'
+    'bot.apps.BotConfig',
+    'userbot.apps.UserbotConfig',
 ]
 
 MIDDLEWARE = [
@@ -121,7 +124,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'app.wsgi.application'
-
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
@@ -191,7 +193,6 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 )
 
-
 REDIS_HOST = env('REDIS_HOST', default=None)
 REDIS_PORT = env.int('REDIS_PORT', default=6379)
 REDIS_FSM_DB = env.int('REDIS_FSM_DB', default=0)
@@ -200,14 +201,32 @@ REDIS_DIALOG_DB = env.int('REDIS_DIALOG_DB', default=1)
 BOT_TOKEN = env('BOT_TOKEN', default=None)
 ADMINS = env.list('ADMINS', cast=int, default=[])
 
-WEB_SERVER_HOST=env('WEB_SERVER_HOST', default="localhost")
-WEB_SERVER_PORT=env.int('WEB_SERVER_PORT', default=8080)
-WEBHOOK_SECRET=env('WEBHOOK_SECRET', default="my-secret")
-BASE_WEBHOOK_URL=env('BASE_WEBHOOK_URL', default=None)
-WEBHOOK_PATH=env('WEBHOOK_PATH', default="/webhook")
+API_ID = env('API_ID', default=None)
+API_HASH = env('API_HASH', default=None)
+SESSION_PATH = env('SESSION_PATH', default=None)
+PHONE_NUMBER = env('PHONE_NUMBER', default=None)
+PASSWORD = env('PASSWORD', default=None)
+
+WEB_SERVER_HOST = env('WEB_SERVER_HOST', default="localhost")
+WEB_SERVER_PORT = env.int('WEB_SERVER_PORT', default=8080)
+WEBHOOK_SECRET = env('WEBHOOK_SECRET', default="my-secret")
+BASE_WEBHOOK_URL = env('BASE_WEBHOOK_URL', default=None)
+WEBHOOK_PATH = env('WEBHOOK_PATH', default="/webhook")
 
 SEQ_KEY = env('SEQ_KEY', default=None)
 SEQ_URL = env('SEQ_URL', default=None)
 SEQ_BATCH = env.int('SEQ_BATCH', default=10)
 SEQ_TIMEOUT = env.int('SEQ_TIMEOUT', default=10)
 SEQ_LEVEL = env.int('SEQ_LEVEL', default=20)
+
+if SEQ_URL and SEQ_KEY:
+    seqlog.log_to_seq(
+        server_url=SEQ_URL,
+        api_key=SEQ_KEY,
+        level=SEQ_LEVEL,
+        batch_size=SEQ_BATCH,
+        auto_flush_timeout=SEQ_TIMEOUT,
+        override_root_logger=True
+    )
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
