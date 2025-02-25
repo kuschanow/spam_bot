@@ -65,6 +65,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'debug_toolbar',
 
+    'django_celery_beat',
+    'django_celery_results',
+
     'bot.apps.BotConfig',
     'userbot.apps.UserbotConfig',
 ]
@@ -197,6 +200,15 @@ REDIS_HOST = env('REDIS_HOST', default=None)
 REDIS_PORT = env.int('REDIS_PORT', default=6379)
 REDIS_FSM_DB = env.int('REDIS_FSM_DB', default=0)
 REDIS_DIALOG_DB = env.int('REDIS_DIALOG_DB', default=1)
+REDIS_CELERY_DB = env.int('REDIS_DIALOG_DB', default=2)
+REDIS_PUBSUB_DB = env.int('REDIS_PUBSUB_DB', default=3)
+REDIS_PUBSUB_CHANNEL = env('REDIS_PUBSUB_CHANNEL', default="bot")
+
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_CELERY_DB}")
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default="django-db")
+CELERY_BEAT_SCHEDULER = env('CELERY_BEAT_SCHEDULER', default='django_celery_beat.schedulers:DatabaseScheduler')
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = env.bool('CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP', default=True)
+CELERY_TIMEZONE = env('CELERY_TIMEZONE', default='UTC')
 
 BOT_TOKEN = env('BOT_TOKEN', default=None)
 ADMINS = env.list('ADMINS', cast=int, default=[])

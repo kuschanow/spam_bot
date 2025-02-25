@@ -36,6 +36,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from bot.generate_session import bot, dp
+        from bot.handlers import handlers_router
+
+        dp.include_router(handlers_router)
 
         dp.startup.register(on_startup)
         dp.shutdown.register(on_shutdown)
