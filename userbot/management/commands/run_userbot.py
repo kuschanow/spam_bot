@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 import redis.asyncio as aioredis
@@ -11,56 +12,56 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_messages():
-    redis = aioredis.from_url(
+    redis_conn = aioredis.from_url(
         f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_PUBSUB_DB}",
         decode_responses=True
     )
-    pubsub = redis.pubsub()
+    pubsub = redis_conn.pubsub()
     await pubsub.subscribe(settings.REDIS_PUBSUB_CHANNEL)
 
-    async for message in pubsub.listen():
-        # message — это dict вида:
-        # {
-        #    "type": "message",
-        #    "pattern": None,
-        #    "channel": "channel_name",
-        #    "data": "..."
-        # }
-        if message["type"] == "message":
-            raw_data = message["data"]
-            if raw_data.get("message") == "get_chat_list":
-                dialogs = await client.get_dialogs()
-                redis.publish(settings.REDIS_PUBSUB_CHANNEL, {"chat_list": [f"{dialog.name}, {dialog.entity.id}" for dialog in dialogs]})
+    try:
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                raw_data = message["data"]
+                if raw_data == "get_chat_list":
+                    dialogs = await client.get_dialogs()
+                    await redis_conn.publish(
+                        settings.REDIS_PUBSUB_CHANNEL + "_response",
+                        json.dumps({"chat_list": [f"{d.name}, `{d.entity.id}`" for d in dialogs]})
+                    )
+    except asyncio.CancelledError:
+        # Очищаемся, если таск отменят
+        logger.info("handle_messages() cancelled")
+    finally:
+        # Закрываем pubsub
+        await pubsub.unsubscribe(settings.REDIS_PUBSUB_CHANNEL)
+        await pubsub.close()
 
 
-async def on_start():
+async def main():
     logger.info("Starting user bot")
     await client.start(phone=settings.PHONE_NUMBER, password=settings.PASSWORD)
     logger.info("User bot started")
-    asyncio.create_task(handle_messages())
-    await client.run_until_disconnected()
 
-
-async def on_stop():
-    logger.info("Stopping user bot")
-    await client.disconnect()
-    logger.info("User bot stopped")
+    # Запускаем 2 параллельные задачи:
+    #  1. Сам Telethon-клиент (до disconnect)
+    #  2. Чтение сообщений из Redis PubSub
+    task = asyncio.create_task(handle_messages())
+    try:
+        await client.run_until_disconnected()
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt caught")
+    finally:
+        # Останавливаем client, отменяем нашу таску
+        logger.info("Stopping user bot")
+        await client.disconnect()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        logger.info("User bot stopped")
 
 
 class Command(BaseCommand):
     help = "Start telegram user bot"
 
-    def add_arguments(self, parser):
-        pass
-
     def handle(self, *args, **options):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        try:
-            loop.run_until_complete(on_start())
-        except KeyboardInterrupt:
-            logger.info("KeyboardInterrupt caught. Exiting...")
-        finally:
-            loop.run_until_complete(on_stop())
-            loop.close()
+        asyncio.run(main())

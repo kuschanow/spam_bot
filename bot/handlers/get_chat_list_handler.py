@@ -1,8 +1,11 @@
+import json
+
 import redis.asyncio as aioredis
-from aiogram import Router, F
-from aiogram.filters import Command, MagicData
+from aiogram import Router
+from aiogram.filters import Command
 from aiogram.types import Message
 from django.conf import settings
+from aiogram.enums import ParseMode
 
 get_chat_list_router = Router()
 
@@ -12,14 +15,14 @@ redis = aioredis.from_url(
 )
 
 
-@get_chat_list_router.message(Command("get_chat_list"), MagicData(F.message.chat.id._is(2044164706)))
+@get_chat_list_router.message(Command("get_chat_list"))
 async def get_chat_list(message: Message):
     pubsub = redis.pubsub()
-    await pubsub.subscribe(settings.REDIS_PUBSUB_CHANNEL)
+    await pubsub.subscribe(settings.REDIS_PUBSUB_CHANNEL + "_response")
 
-    redis.publish(settings.REDIS_PUBSUB_CHANNEL, {"message": "get_chat_list"})
+    await redis.publish(settings.REDIS_PUBSUB_CHANNEL, "get_chat_list")
 
-    async for message in pubsub.listen():
+    async for pubsub_message in pubsub.listen():
         # message — это dict вида:
         # {
         #    "type": "message",
@@ -27,6 +30,11 @@ async def get_chat_list(message: Message):
         #    "channel": "channel_name",
         #    "data": "..."
         # }
-        if message["type"] == "message":
-            raw_data = message["data"]
-            await message.answer(raw_data)
+        if pubsub_message["type"] == "message":
+            raw_data = pubsub_message["data"]
+            chats = json.loads(raw_data)["chat_list"]
+            for i in range(0, len(chats), 50):
+                batch = chats[i: i + 50]
+                await message.answer("\n".join(batch), parse_mode=ParseMode.MARKDOWN)
+            await pubsub.unsubscribe()
+            break
